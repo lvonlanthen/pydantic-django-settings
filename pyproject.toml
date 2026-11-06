@@ -36,6 +36,9 @@ dependencies = [
     "pydantic-settings>=2.7",
 ]
 
+[project.entry-points.pytest11]
+pydantic_django_settings = "pydantic_django_settings.pytest_plugin"
+
 [project.urls]
 Homepage = "https://github.com/lvonlanthen/pydantic-django-settings"
 Repository = "https://github.com/lvonlanthen/pydantic-django-settings"
