@@ -67,8 +67,10 @@ ignore = ["RUF012"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
+known-first-party = ["pydantic_django_settings", "example_project"]
 lines-after-imports = 2
 
 [tool.mypy]
 strict = true
+mypy_path = ["tests"]
 plugins = ["pydantic.mypy"]
