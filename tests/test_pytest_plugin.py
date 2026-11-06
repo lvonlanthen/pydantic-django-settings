@@ -78,6 +78,6 @@ def test_runs_before_pytest_django_loads_the_settings(pytester: pytest.Pytester)
     )
     result = pytester.runpytest_subprocess("-p", "pytest_django", "--rootdir", str(pytester.path))
     result.assert_outcomes(passed=1)
-    result.stdout.fnmatch_lines(
-        ["settings class: Testing (from ini)", "*settings: example_project.settings (from ini)*"]
-    )
+    # The order of the two header lines depends on the plugin registration order, which varies per environment.
+    result.stdout.fnmatch_lines(["settings class: Testing (from ini)"])
+    result.stdout.fnmatch_lines(["*settings: example_project.settings (from ini)*"])
