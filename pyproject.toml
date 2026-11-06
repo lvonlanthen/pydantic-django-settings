@@ -61,6 +61,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# RUF012 flags mutable defaults of pydantic fields on subclasses of DjangoSettings, because ruff only recognises
+# classes that inherit from pydantic directly. Pydantic copies field defaults per instance, so the rule does not apply.
+ignore = ["RUF012"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
