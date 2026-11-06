@@ -1,0 +1,71 @@
+[build-system]
+requires = ["uv_build>=0.10,<0.11"]
+build-backend = "uv_build"
+
+[project]
+name = "pydantic-django-settings"
+version = "0.1.0"
+description = "Define Django settings as pydantic-settings classes, one per environment, selected by DJANGO_SETTINGS_CLASS"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Lukas Vonlanthen", email = "lukas.vonlanthen@gmail.com" },
+]
+keywords = ["django", "settings", "pydantic", "pydantic-settings", "django-configurations"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
+    "Framework :: Pydantic",
+    "Framework :: Pydantic :: 2",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Typing :: Typed",
+]
+dependencies = [
+    "django>=5.2",
+    "pydantic-settings>=2.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/lvonlanthen/pydantic-django-settings"
+Repository = "https://github.com/lvonlanthen/pydantic-django-settings"
+Changelog = "https://github.com/lvonlanthen/pydantic-django-settings/releases"
+
+[dependency-groups]
+dev = [
+    "django-stubs",
+    "mypy",
+    "pytest",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["tests"]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
