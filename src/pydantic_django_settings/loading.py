@@ -1,9 +1,11 @@
 import os
+import re
 from collections.abc import Iterable
 from typing import Final
 
 from django.core.exceptions import ImproperlyConfigured
 from pydantic import ValidationError
+from pydantic_settings import SettingsError
 
 from pydantic_django_settings.base import DjangoSettings
 
@@ -64,3 +66,10 @@ def load_settings(name: str, cls: type[DjangoSettings]) -> DjangoSettings:
             f"{environment_variable(cls, e['loc'])}: {e['msg']}" for e in error.errors(include_input=False)
         )
         raise ImproperlyConfigured(f"Invalid settings for {name}: {problems}") from None
+    except SettingsError as error:
+        # pydantic-settings parses list, dict and model fields as JSON before validation and reports malformed JSON
+        # as a SettingsError naming the field, e.g. 'error parsing value for field "PORTS" from source
+        # "EnvSettingsSource"'. Report it like a validation problem, by the variable, without the value.
+        match = re.search(r'field "([^"]+)"', str(error))
+        variable = environment_variable(cls, (match.group(1),)) if match else "?"
+        raise ImproperlyConfigured(f"Invalid settings for {name}: {variable}: value is not valid JSON") from None

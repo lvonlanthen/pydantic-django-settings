@@ -32,7 +32,7 @@ def pytest_load_initial_conftests(early_config: pytest.Config, parser: pytest.Pa
     option = parser.parse_known_args(args).django_settings_class
     if option:
         value, source = option, "option"
-    elif SETTINGS_CLASS_ENV in os.environ:
+    elif os.environ.get(SETTINGS_CLASS_ENV):
         value, source = os.environ[SETTINGS_CLASS_ENV], "env"
     elif early_config.getini(SETTINGS_CLASS_ENV):
         value, source = early_config.getini(SETTINGS_CLASS_ENV), "ini"

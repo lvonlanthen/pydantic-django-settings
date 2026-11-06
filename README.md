@@ -1,6 +1,6 @@
 # pydantic-django-settings
 
-Define Django settings as [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) classes, one per environment, and select one with `DJANGO_SETTINGS_CLASS`. A drop-in successor to [django-configurations](https://github.com/jazzband/django-configurations) for projects that want their settings validated at startup, their secrets kept out of error messages, and no import hook.
+Define Django settings as [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) classes, one per environment, and select one with `DJANGO_SETTINGS_CLASS`. A successor to [django-configurations](https://github.com/jazzband/django-configurations) for projects that want their settings validated at startup, their secrets kept out of error messages, and no import hook.
 
 ```python
 # myproject/settings/__init__.py
@@ -147,6 +147,8 @@ Invalid settings for Production: DJANGO_SECRET_KEY: Field required; DJANGO_ALLOW
 ```
 
 The pydantic `ValidationError` is deliberately not chained, because its message echoes the input values, including secrets, into the log.
+
+This holds for pydantic's own types, whose messages name the expected values and constraints only. A custom `field_validator` that puts the value into its own message defeats it, so keep values out of validator messages. Malformed JSON for a list, dict or model field that is not a `CommaSeparatedList` is reported the same way, as `DJANGO_PORTS: value is not valid JSON`.
 
 ## pytest
 

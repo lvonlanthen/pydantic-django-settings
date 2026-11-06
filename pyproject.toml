@@ -49,6 +49,7 @@ dev = [
     "django-stubs",
     "mypy",
     "pytest",
+    "pytest-django>=4.14.0",
     "ruff",
 ]
 

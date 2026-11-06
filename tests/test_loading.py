@@ -116,3 +116,18 @@ def test_nested_locations_are_appended_to_the_variable(monkeypatch: pytest.Monke
     monkeypatch.setenv("DJANGO_PORTS", '[8000, "http"]')
     with pytest.raises(ImproperlyConfigured, match=r"DJANGO_PORTS\[1\]: Input should be a valid integer"):
         load_settings("Production", Production)
+
+
+def test_malformed_json_for_a_complex_field_is_reported_like_a_validation_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name, value in PRODUCTION_ENV.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("DJANGO_PORTS", "8000,8001")
+    with pytest.raises(ImproperlyConfigured) as excinfo:
+        load_settings("Production", Production)
+    message = str(excinfo.value)
+    assert message.startswith("Invalid settings for Production: DJANGO_PORTS: ")
+    assert "JSON" in message
+    assert "8000" not in message
+    assert excinfo.value.__cause__ is None
