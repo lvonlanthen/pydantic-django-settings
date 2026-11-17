@@ -109,6 +109,61 @@ Declare secrets as `SecretStr`, `SecretBytes` or `Secret[T]`. Inside the pydanti
 
 pydantic-settings parses list fields from the environment as JSON. `CommaSeparatedList` reads `DJANGO_ALLOWED_HOSTS=a.example.ch, b.example.ch` instead, stripping whitespace and dropping empty items, which is what django-configurations' `ListValue` did.
 
+It is `list[str]` only. For another item type, a tuple or a set, annotate the field with the same splitter, `split_comma_separated`, and let pydantic convert the items:
+
+```python
+from typing import Annotated
+
+from pydantic import BeforeValidator
+from pydantic_django_settings import split_comma_separated
+from pydantic_settings import NoDecode
+
+PORTS: Annotated[list[int], NoDecode, BeforeValidator(split_comma_separated)] = []
+LANGUAGES: Annotated[tuple[str, ...], NoDecode, BeforeValidator(split_comma_separated)] = ()
+```
+
+### URL-based settings
+
+This library does not parse URLs such as `DATABASE_URL`. Use the packages that django-configurations wrapped in its `DatabaseURLValue`, `CacheURLValue`, `EmailURLValue` and `SearchURLValue`: [dj-database-url](https://pypi.org/project/dj-database-url/), [django-cache-url](https://pypi.org/project/django-cache-url/), [dj-email-url](https://pypi.org/project/dj-email-url/) and [dj-search-url](https://pypi.org/project/dj-search-url/). Read the URL into a lowercase field and compute the setting from it:
+
+```python
+import dj_database_url
+
+
+class Base(DjangoSettings):
+    database_url: SecretStr = Field(validation_alias="DATABASE_URL")
+
+    @property
+    def DATABASES(self) -> dict[str, Any]:
+        return {"default": dj_database_url.parse(self.database_url.get_secret_value())}
+```
+
+Call the package's `parse()` on the field instead of its `config()`, which reads `os.environ` itself and so bypasses the validation: with the field, a missing variable is reported as `DATABASE_URL: Field required` like any other. Declare the URL as `SecretStr`, since it carries the password. A URL that is set but malformed raises the parser's own exception, e.g. `dj_database_url.UnknownSchemeError`, not `ImproperlyConfigured`.
+
+A parser that returns several settings, as dj-email-url does, needs one property per setting, because only uppercase attributes are exported:
+
+```python
+import dj_email_url
+
+
+class EmailSettings(DjangoSettings):
+    email_url: SecretStr = Field(SecretStr("console://"), validation_alias="EMAIL_URL")
+
+    @property
+    def _email(self) -> dict[str, Any]:
+        return dj_email_url.parse(self.email_url.get_secret_value())
+
+    @property
+    def EMAIL_BACKEND(self) -> str:
+        return self._email["EMAIL_BACKEND"]
+
+    @property
+    def EMAIL_HOST(self) -> str:
+        return self._email["EMAIL_HOST"]
+
+    # ... and so on for EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, EMAIL_USE_TLS
+```
+
 ### `post_setup`
 
 `DjangoSettings.post_setup()` is a no-op hook that `setup` runs after the export, for things like initialising an error-reporting SDK:
@@ -168,12 +223,38 @@ The pytest header reports what was picked: `settings class: Testing (from ini)`.
 2. Rename `DJANGO_CONFIGURATION` to `DJANGO_SETTINGS_CLASS` everywhere: `manage.py`, `wsgi.py`, `asgi.py`, Dockerfiles, compose files, CI, deployment templates and the pytest ini. The old name cannot stay: pytest-django hard-wires it to the django-configurations importer.
 3. In `manage.py`, `wsgi.py` and `asgi.py`, import `execute_from_command_line`, `get_wsgi_application` and `get_asgi_application` from Django again instead of from `configurations`.
 4. Change the base class from `configurations.Configuration` to `DjangoSettings`, and mixins from plain classes to `DjangoSettings` subclasses.
-5. Add a type annotation to every attribute, and decide its kind: `values.Value(...)` becomes a pydantic field with the matching type, with `validation_alias` where `environ_name` or `environ_prefix` was used; everything else becomes a `ClassVar`. django-configurations only read the environment for explicit `values.Value` attributes, so the same set of settings stays tunable. Wrap secrets in `SecretStr`.
+5. Add a type annotation to every attribute, and decide its kind: `values.Value(...)` becomes a pydantic field with the matching type, with `validation_alias` where `environ_name` or `environ_prefix` was used; everything else becomes a `ClassVar`. django-configurations only read the environment for explicit `values.Value` attributes, so the same set of settings stays tunable. Wrap secrets in `SecretStr`. `DatabaseURLValue` and the other URL values become a field plus a computed setting, see [URL-based settings](#url-based-settings).
 6. Turn `post_setup` classmethods into instance methods: `cls` becomes `self`.
 7. Replace `settings.CONFIGURATION`, which held a dotted path, with `settings.SETTINGS_CLASS`, which holds the class name.
 8. End the settings package with `setup(globals(), [...], default="Development")` and remove any `DJANGO_CONFIGURATION` fallback.
 
+How each `values` class translates. A `validation_alias` is the full variable name, so `environ_name="FOO"`, which django-configurations read from `DJANGO_FOO`, becomes `validation_alias="DJANGO_FOO"`.
+
+| django-configurations | Environment format | Here |
+|---|---|---|
+| `Value` | string | `str` |
+| `Value(environ=False)` | not read | `ClassVar` |
+| `environ_required=True` | must be set | a field without a default |
+| `BooleanValue` | `yes`, `no`, `true`, `false`, `1`, `0`, … | `bool` |
+| `IntegerValue`, `FloatValue`, `DecimalValue` | number | `int`, `float`, `Decimal` |
+| `PositiveIntegerValue` | number, zero allowed | `NonNegativeInt` |
+| `ListValue` | `a,b,c` | `CommaSeparatedList` |
+| `ListValue(converter=int)`, `TupleValue`, `SetValue` | `a,b,c` | `split_comma_separated` with `list[int]`, `tuple[str, ...]`, `set[str]`, see [`CommaSeparatedList`](#commaseparatedlist) |
+| `separator=` other than a comma | `a;b;c` | your own `BeforeValidator`, or JSON |
+| `SingleNestedListValue`, `SingleNestedTupleValue` | `a,b;c,d` | `list[list[str]]`, given as JSON `[["a","b"],["c","d"]]` |
+| `DictValue` | Python literal `{'a': 1}` | `dict[str, Any]`, given as JSON `{"a": 1}` |
+| `BackendsValue` | `a.B,c.D` | `CommaSeparatedList`, without the check that each path imports |
+| `EmailValue` | string | `EmailStr`, which needs `pydantic[email]` |
+| `URLValue` | string | `AnyUrl` or `HttpUrl`; the setting is then a URL object, not a `str` |
+| `IPValue` | string | `IPvAnyAddress`; the setting is then an `ipaddress` object, not a `str` |
+| `RegexValue(regex=...)` | string | `str` with `Field(pattern=...)` |
+| `PathValue` | path that must exist | `FilePath` or `DirectoryPath`; `Path` for `check_exists=False`. `~` is not expanded |
+| `SecretValue` | must be set and non-empty | `SecretStr` without a default |
+| `DatabaseURLValue`, `CacheURLValue`, `EmailURLValue`, `SearchURLValue` | URL | [URL-based settings](#url-based-settings) |
+
 Behaviour that changes:
+
+- Nested sequences and dicts are given as JSON, so a deployment that sets a `SingleNestedListValue` or a `DictValue` through the environment has to reformat that value.
 
 - django-configurations copied every Django default onto the class, which made Django warn about deprecated settings you never set. This library exports only what you declare.
 - Booleans: an empty variable counts as unset instead of false, and pydantic accepts `on`/`off`/`t`/`f` in addition to `true`/`false`/`yes`/`no`/`1`/`0`.

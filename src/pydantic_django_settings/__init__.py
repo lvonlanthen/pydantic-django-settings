@@ -15,13 +15,14 @@ from typing import Any
 
 from pydantic_django_settings.base import CommaSeparatedList
 from pydantic_django_settings.base import DjangoSettings
+from pydantic_django_settings.base import split_comma_separated
 from pydantic_django_settings.export import django_settings
 from pydantic_django_settings.loading import SETTINGS_CLASS_ENV
 from pydantic_django_settings.loading import load_settings
 from pydantic_django_settings.loading import select_settings_class
 
 
-__all__ = ["SETTINGS_CLASS_ENV", "CommaSeparatedList", "DjangoSettings", "setup"]
+__all__ = ["SETTINGS_CLASS_ENV", "CommaSeparatedList", "DjangoSettings", "setup", "split_comma_separated"]
 
 
 def setup(
